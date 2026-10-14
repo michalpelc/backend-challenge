@@ -2,11 +2,9 @@ package com.example.prmonitor.service.github;
 
 import com.example.prmonitor.api.GitHubPullRequestClient;
 import com.example.prmonitor.domain.github.GitHubPullRequest;
-import com.example.prmonitor.domain.github.PullRequestPage;
 import com.example.prmonitor.domain.github.PullRequestReport;
 
 import java.util.ArrayList;
-import java.util.List;
 
 public final class GitHubPullRequestService {
 
@@ -19,22 +17,22 @@ public final class GitHubPullRequestService {
     }
 
     public PullRequestReport scan(String owner, String repo) {
-        List<GitHubPullRequest> all = new ArrayList<>();
-        int page = 1;
-        boolean hasNext;
+        var all = new ArrayList<GitHubPullRequest>();
+        var page = 1;
 
-        // Fetch and collect all available pages.
-        do {
-            PullRequestPage result = client.fetchOpenPullRequests(owner, repo, page, perPage);
+        while (true) {
+            var result = client.fetchOpenPullRequests(owner, repo, page, perPage);
             all.addAll(result.items());
-            hasNext = result.hasNext();
+            if (!result.hasNext()) {
+                break;
+            }
             page++;
-        } while (hasNext);
+        }
 
-        // Include only open PRs that are not drafts.
-        List<GitHubPullRequest> eligible = all.stream().filter(pr -> "open".equalsIgnoreCase(pr.state()) && !pr.draft()).toList();
+        var eligible = all.stream().filter(pr -> "open".equalsIgnoreCase(pr.state()) && !pr.draft()).toList();
 
-        return new PullRequestReport(all, eligible, page - 1);
+        return new PullRequestReport(all, eligible, page);
+        // At this point the results are collected into single list and complete dataset is returned
     }
 
 }
