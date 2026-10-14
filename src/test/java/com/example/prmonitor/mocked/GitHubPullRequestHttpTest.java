@@ -73,13 +73,26 @@ class GitHubPullRequestHttpTest {
     }
 
 
+
     @ParameterizedTest
     @ValueSource(ints = {SC_FORBIDDEN, SC_INTERNAL_SERVER_ERROR})
     void shouldRejectHttpErrors(int status) {
-        server.enqueue(new MockResponse().setResponseCode(status).setHeader("Content-Type", "application/json").setBody("[]"));
-        assertThatThrownBy(() -> service.scan("appwrite", "appwrite")).isInstanceOf(AssertionError.class).hasMessageContaining("Expected status code <200> but was <" + status + ">");
-    }
+        // The retry policy allows 3 HTTP attempts in total. MockWebServer must provide a response for each attempt.
+        for (int attempt = 0; attempt < 3; attempt++) {
+            server.enqueue(new MockResponse()
+                    .setResponseCode(status)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("[]"));
+        }
 
+        // Verify that the client rejects the HTTP error after exhausting all retry attempts.
+        assertThatThrownBy(() -> service.scan("appwrite", "appwrite"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("GitHub request failed after retries")
+                .hasMessageContaining("repo=appwrite/appwrite")
+                .hasMessageContaining("page=1")
+                .hasMessageContaining("HTTP=" + status);
+    }
 
     @Test
     void shouldRejectInvalidSchemaOnSecondPage() throws JsonProcessingException {
